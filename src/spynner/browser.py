@@ -38,8 +38,9 @@ import autopy
 
 try:
     from PySide import QtCore
-    QtCore.QString = str
-    from PySide.QtCore import SIGNAL, QUrl, QString, Qt, QEvent
+    from PySide.QtCore import QUrl, Qt, QEvent
+    QString = str
+    QVariant = str
     from PySide.QtCore import QSize, QDateTime, QPoint
     from PySide.QtGui import QApplication, QImage, QPainter
     from PySide.QtGui import QCursor, QMouseEvent, QKeyEvent
@@ -50,15 +51,18 @@ try:
 except Exception as e:
     HAS_PYSIDE = False
     from PyQt4 import QtCore
-    from PyQt4.QtCore import SIGNAL, QUrl, QString, Qt, QEvent
+    from PyQt4.QtCore import QUrl, QString, Qt, QEvent, QVariant
     from PyQt4.QtCore import QSize, QDateTime, QPoint
     from PyQt4.QtGui import QApplication, QImage, QPainter
     from PyQt4.QtGui import QCursor, QMouseEvent, QKeyEvent
     from PyQt4.QtNetwork import QNetworkCookie, QNetworkAccessManager, QSslConfiguration, QSslCipher
     from PyQt4.QtNetwork import QNetworkCookieJar, QNetworkRequest, QNetworkProxy, QSsl, QSslSocket
     from PyQt4.QtWebKit import QWebPage, QWebView
-    from PyQt4.QtWebKit import QWebInspector
 
+try:
+    from PyQt4.QtWebKit import QWebInspector      # load inspector anyway
+except:
+    pass
 
 SpynnerQapplication = None
 
@@ -81,24 +85,25 @@ class Browser(object):
     _jquery = 'jquery-1.5.2.js'
     _jquery_simulate = 'jquery.simulate.js'
 
-    def __init__(self,
-                 qappargs=None,
-                 debug_level=ERROR,
-                 want_compat=False,
-                 embed_jquery=False,
-                 embed_jquery_simulate=False,
-                 additional_js_files = None,
-                 jslib = None,
-                 download_directory = ".",
-                 user_agent = None,
-                 debug_stream = sys.stderr,
-                 event_looptime = 0.01 ,
-                 ignore_ssl_errors = True,
-                 headers = None,
-                 ssl_protocol=None,
-                 ssl_ciphers = None,
-                 inspector=False,
-                ):
+    def __init__(
+            self,
+            qappargs=None,
+            debug_level=ERROR,
+            want_compat=False,
+            embed_jquery=False,
+            embed_jquery_simulate=False,
+            additional_js_files=None,
+            jslib=None,
+            download_directory=".",
+            user_agent=None,
+            debug_stream=sys.stderr,
+            event_looptime=0.01,
+            ignore_ssl_errors=True,
+            headers=None,
+            ssl_protocol=None,
+            ssl_ciphers=None,
+            inspector=False,
+    ):
         """
         Init a Browser instance.
         @param qappargs: Arguments for QApplication constructor.
@@ -254,7 +259,7 @@ class Browser(object):
         self._debug(INFO, "Page load started")
 
     def _on_manager_ssl_errors(self, reply, errors):
-        url = six.u(toString(reply.url()))
+        url = toString(reply.url())
         if self.ignore_ssl_errors:
             self._debug(WARNING, "SSL certificate error ignored: %s" % url)
             reply.ignoreSslErrors()
@@ -262,8 +267,8 @@ class Browser(object):
             self._debug(WARNING, "SSL certificate error: %s" % url)
 
     def _on_authentication_required(self, reply, authenticator):
-        url = six.u(toString(reply.url()))
-        realm = six.u(authenticator.realm())
+        url = toString(reply.url())
+        realm = authenticator.realm()
         self._debug("HTTP auth required: %s (realm: %s)" % (url, realm))
         if not self._http_authentication_callback:
             self._debug(WARNING, "HTTP auth required, but no callback defined")
@@ -280,7 +285,7 @@ class Browser(object):
 
     def _on_reply(self, reply):
         self._replies += 1
-        self._reply_url = six.u(toString(reply.url()))
+        self._reply_url = toString(reply.url())
         self._reply_status = not bool(reply.error())
         self.cookies = merge_cookies(
             self.cookies,
@@ -325,7 +330,7 @@ class Browser(object):
             self._debug(INFO, "Javascript console: %s" % message)
 
     def _javascript_confirm(self, webframe, message):
-        smessage = six.u(message)
+        smessage = message
         url = webframe.url()
         self._debug(INFO, "Javascript confirm (webframe url = %s): %s" %
             (url, smessage))
@@ -337,7 +342,7 @@ class Browser(object):
 
     def _javascript_prompt(self, webframe, message, defaultvalue, result):
         url = webframe.url()
-        smessage = six.u(message)
+        smessage = message
         self._debug(INFO, "Javascript prompt (webframe url = %s): %s" %
             (url, smessage))
         if self._javascript_prompt_callback:
@@ -384,7 +389,7 @@ class Browser(object):
         return path
 
     def _start_download(self, reply, outfd):
-        url = six.u(toString(reply.url()))
+        url = toString(reply.url())
         path = None
         if outfd is None:
             path = self._get_filepath_for_url(url, reply)
@@ -453,16 +458,22 @@ class Browser(object):
             _debug(*args, **kwargs)
 
     def get_js_obj_length(self, res):
-        if res.type() != res.Map:
-            return False
-        resmap = res.toMap()
-        lenfield = QString(u'length')
+        if isinstance(res, dict):
+            resmap = res
+        else:
+            if res.type() != res.Map:
+                return False
+            resmap = res.toMap()
+        lenfield = 'length'
         if lenfield not in resmap:
             return False
-        if resmap[lenfield].type() == resmap[lenfield].Double:
-            return int(resmap[lenfield].toDouble()[0])
+        if isinstance(resmap[lenfield], float):
+            return int(resmap[lenfield])
         else:
-            return resmap[lenfield].toInt()[0]
+            if resmap[lenfield].type() == resmap[lenfield].Double:
+                return int(resmap[lenfield].toDouble()[0])
+            else:
+                return resmap[lenfield].toInt()[0]
 
     def jslen(self, selector):
         res = self.runjs("%s('%s')" % (self.jslib, selector))
@@ -475,7 +486,7 @@ class Browser(object):
         return res
 
     def _get_html(self):
-        return six.u(self.webframe.toHtml())
+        return toString(self.webframe.toHtml())
 
     def _get_soup(self):
         if not self._html_parser:
@@ -483,7 +494,7 @@ class Browser(object):
         return self._html_parser(self.html)
 
     def _get_url(self):
-        return six.u(toString(self.webframe.url()))
+        return toString(self.webframe.url())
 
     url = property(_get_url)
     """Current URL."""
@@ -614,10 +625,10 @@ class Browser(object):
     def wait_a_little(br, timeout):
         try:
             br.wait_load(timeout)
-        except SpynnerTimeout as e:
+        except SpynnerTimeout:
             pass
 
-    def wait_requests(self, wait_requests = None, url = None, url_regex = None):
+    def wait_requests(self, wait_requests=None, url=None, url_regex=None):
         if wait_requests:
             while self._replies < wait_requests:
                 self._events_loop()
@@ -635,7 +646,8 @@ class Browser(object):
                 self._events_loop()
             self._events_loop(0.0)
 
-    def sendText(self, selector, text, keyboard_modifiers = Qt.NoModifier, wait_load=False, wait_requests=None, timeout=None):
+    def sendText(self, selector, text, keyboard_modifiers=Qt.NoModifier,
+                 wait_load=False, wait_requests=None, timeout=None):
         """
         Send text in any element (to fill it for example)
 
@@ -649,14 +661,15 @@ class Browser(object):
         """
         element = self.webframe.findFirstElement(selector)
         element.setFocus()
-        eventp = QKeyEvent(QEvent.KeyPress, Qt.Key_A, keyboard_modifiers, QString(text))
+        eventp = QKeyEvent(QEvent.KeyPress, Qt.Key_A, keyboard_modifiers, text)
         self.application.sendEvent(self.webview, eventp)
         self._events_loop(timeout)
         self.wait_requests(wait_requests)
         if wait_load:
             return self._wait_load(timeout)
 
-    def sendKeys(self, selector, keys, keyboard_modifiers = Qt.NoModifier, wait_load=False, wait_requests=None, timeout=None):
+    def sendKeys(self, selector, keys, keyboard_modifiers=Qt.NoModifier,
+                 wait_load=False, wait_requests=None, timeout=None):
         """
         Click any clickable element in page.
         see http://www.riverbankcomputing.co.uk/static/Docs/PyQt4/html/qt.html#Key-enum
@@ -884,7 +897,8 @@ class Browser(object):
                               for AJAX requests.
         """
         element = self.webframe.findFirstElement(selector)
-        return self.wk_click_element(element, wait_load=wait_load, wait_requests=wait_requests, timeout=timeout)
+        return self.wk_click_element(element, wait_load=wait_load, wait_requests=wait_requests,
+                                     timeout=timeout)
 
     def wk_click_link(self, selector, timeout=None):
         """Click a link and wait for the page to load.
@@ -906,7 +920,8 @@ class Browser(object):
         element = self.webframe.findFirstElement(selector)
         return self.wk_click_element_ajax(element, wait_requests=wait_requests, timeout=timeout)
 
-    def native_click(self, selector, wait_load=False, wait_requests=None, timeout=1, offsetx = 5, offsety = 5, real=False, pdb=False):
+    def native_click(self, selector, wait_load=False, wait_requests=None,
+                     timeout=1, offsetx=5, offsety=5, real=False, pdb=False):
         """
         Click any clickable element in page by sending a raw QT mouse event.
 
@@ -929,7 +944,7 @@ class Browser(object):
         if wait_load:
             return self._wait_load(timeout)
 
-    def native_click_link(self, selector, timeout=None, offsetx = 0, offsety = 0):
+    def native_click_link(self, selector, timeout=None, offsetx=0, offsety=0):
         """Click a link and wait for the page to load using a real mouse event.
         @param selector: jQuery selector.
         @param timeout: Seconds to wait for the page to load before
@@ -937,9 +952,11 @@ class Browser(object):
         @param offsetx: offset to click on the widget to the top left of it on the X axis (left to right)
         @param offsety: offset to click on the widget to the top left of it on the Y axix (top to bottom)
         """
-        return self.native_click(selector, wait_load=True, timeout=timeout, offsetx=offsetx, offsety=offsety)
+        return self.native_click(selector, wait_load=True, timeout=timeout,
+                                 offsetx=offsetx, offsety=offsety)
 
-    def native_click_ajax(self, selector, wait_requests=1, timeout=None, offsetx = 0, offsety = 0):
+    def native_click_ajax(self, selector, wait_requests=1, timeout=None,
+                          offsetx=0, offsety=0):
         """Click a AJAX link using a raw mouse click and wait for the request to finish.
         @param selector: jQuery selector.
         @param timeout: Seconds to wait for the page to load before
@@ -947,7 +964,8 @@ class Browser(object):
         @param offsetx: offset to click on the widget to the top left of it on the X axis (left to right)
         @param offsety: offset to click on the widget to the top left of it on the Y axix (top to bottom)
         """
-        return self.native_click(selector, wait_requests=wait_requests, timeout=timeout, offsetx=offsetx, offsety=offsety)
+        return self.native_click(selector, wait_requests=wait_requests, timeout=timeout,
+                                 offsetx=offsetx, offsety=offsety)
 
     def wait_load(self, timeout=None):
         """
@@ -1023,7 +1041,7 @@ class Browser(object):
                 ref_tries = 'unlimited'
             msg = to_msg % (ref_tries, delay)
             if error_message:
-                msg += u'\n%s' % error_message
+                msg += '\n%s' % error_message
             raise SpynnerTimeout(msg)
         else:
             self._debug(DEBUG, found_msg)
@@ -1047,32 +1065,35 @@ class Browser(object):
 
     def close(self):
         """Close Browser instance and release resources."""
-        if self.manager:
-            del self.manager
-        if self.webpage:
-            del self.webpage
+        if not HAS_PYSIDE:
+            if self.webpage:
+                del self.webpage
+            if self.manager:
+                del self.manager
         if self.webview:
             self.destroy_webview()
         self.application.exit()
 
-    def search_element_text(self, search_text, element='a', case_sensitive=False, match_exactly=True):
-        """
-        Search all elements on a page for the specified text, returns a list of elements that contain it.
+    def search_element_text(self, search_text, element='a', case_sensitive=False,
+                            match_exactly=True):
+        """Search all elements on a page for the specified text, returns a list
+        of elements that contain it.
 
         @param search_text: The text to search for.
         @param element: The type of element to search, defaults to anchor tag.
         @param case_sensitive: If true the search will be case sensitive.
         @param match_exactly: If true will match the element's content exactly.
         @return: A list of elements
+
         """
         if not case_sensitive:
-            search_text=search_text.lower()
-        all_elements=self.webframe.findAllElements(element).toList()
-        result=[]
+            search_text = search_text.lower()
+        all_elements = self.webframe.findAllElements(element).toList()
+        result = []
         for e in all_elements:
-            text=e.toPlainText().__str__()
+            text = e.toPlainText().__str__()
             if not case_sensitive:
-                text=text.lower()
+                text = text.lower()
             if match_exactly is True and search_text == text:
                 result.append(e)
             elif match_exactly is False and search_text in text:
@@ -1097,7 +1118,8 @@ class Browser(object):
         if not self.webview:
             return
         self.webview.close()
-        del self.webview
+        if not HAS_PYSIDE:
+            del self.webview          # causes segfault with PySide
 
     def show(self, maximized=True, force=False):
         """Show webview browser."""
@@ -1128,7 +1150,7 @@ class Browser(object):
         if frame is _marker:
             frame = self.webpage.mainFrame()
         try:
-           self._webframe = frame
+            self._webframe = frame
         except:
             raise SpynnerError("childframe does not exist")
         self.load_js()
@@ -1233,8 +1255,8 @@ class Browser(object):
             if remove:
                 rjscode += ("%s('option:selected', "
                             "%s('%s').parents('select')[0])"
-                            ".removeAttr('selected');\n" )% (
-                                self.jslib, self.jslib, s)
+                            ".removeAttr('selected');\n") % \
+                    (self.jslib, self.jslib, s)
             jscode += "%s('%s').attr('selected', 'selected');\n" % (
                 self.jslib, s)
         jscode = rjscode + jscode
@@ -1276,14 +1298,15 @@ class Browser(object):
 
     def wk_select(self, selector, values=None, remove=True):
         """Choose a option in a select using  WebKit API.
+
         @param selector: css selector to get the select item.
-        @param values: string/list of string of values to set pass a single value for a single value.
+        @param values: string/list of string of values to set pass
+                       a single value for a single value.
         """
         element = self.webframe.findFirstElement(selector)
         if not isinstance(values, list) and (values is not None):
             values = [values]
         return self.wk_select_elem(element, values, remove)
-
 
     submit = click_link
 
@@ -1301,6 +1324,8 @@ class Browser(object):
 
         @note: You can change the jq alias (see L{jslib}).
         """
+        if isinstance(jscode, six.binary_type):
+            jscode = jscode.decode("utf-8")
         if debug:
             self._debug(DEBUG, "Run Javascript code: %s" % jscode)
 
@@ -1319,6 +1344,12 @@ class Browser(object):
             # pyside
             if not HAS_PYSIDE:
                 raise
+
+        if not HAS_PYSIDE and isinstance(res, QVariant):
+            res = res.toPyObject()
+
+        if isinstance(res, QString):
+            return toString(res)
         return res
 
     def set_javascript_confirm_callback(self, callback):
@@ -1394,7 +1425,7 @@ class Browser(object):
         @note: If url is a path, the current base URL will be pre-appended.
         """
         def _on_reply(reply):
-            url = six.u(toString(reply.url()))
+            #url = toString(reply.url())
             self._download_reply_status = not bool(reply.error())
         self._download_reply_status = None
         if not urlparse.urlsplit(url).scheme:
@@ -1515,21 +1546,21 @@ def _first(iterable, pred=bool):
         if pred(item):
             return item
 
+
 def _debug(obj, linefeed=True, outfd=sys.stderr, outputencoding="utf8"):
     """Print a debug info line to stream channel"""
-    if isinstance(obj, six.text_type):
-        obj = obj.encode(outputencoding)
     strobj = str(obj) + ("\n" if linefeed else "")
+    if isinstance(strobj, six.text_type):
+        strobj = bytearray(strobj, 'utf-8')
     outfd.write(strobj)
     outfd.flush()
 
 
 def toString(s):
-    if HAS_PYSIDE:
-        if isinstance(s, six.string_types):
-            return s
+    if isinstance(s, six.string_types) or isinstance(s, six.text_type):
+        return s
     if isinstance(s, QString):
-        return u"%s" % s
+        return "%s" % s
     return s.toString()
 
 
@@ -1537,47 +1568,43 @@ def bool2str(value):
     return {True: "TRUE", False: "FALSE"}[value]
 
 
-def byte2str(value):
-    return str(value)
-
-
 def get_cookie_line(cookie):
     domain_flag = str(cookie.domain()).startswith(".")
     return "\t".join([
-        byte2str(cookie.domain()),
+        cookie.domain(),
         bool2str(domain_flag),
-        byte2str(cookie.path()),
+        cookie.path(),
         bool2str(cookie.isSecure()),
-        byte2str(cookie.expirationDate().toTime_t()),
-        byte2str(cookie.name()),
-        byte2str(cookie.value()),
+        cookie.expirationDate().toTime_t(),
+        cookie.name(),
+        cookie.value(),
     ])
 
 
 def get_cookie_info(cookie):
     domain_flag = str(cookie.domain()).startswith(".")
     return {
-        'domain': byte2str(cookie.domain()),
+        'domain': cookie.domain(),
         'domain_flag': domain_flag,
-        'path': byte2str(cookie.path()),
+        'path': cookie.path(),
         'isSecure': cookie.isSecure(),
-        'timestamp': byte2str(cookie.expirationDate().toTime_t()),
-        'name': byte2str(cookie.name()),
-        'value': byte2str(cookie.value()),
+        'timestamp': cookie.expirationDate().toTime_t(),
+        'name': cookie.name(),
+        'value': cookie.value(),
     }
 
 
 def merge_cookies(cookies1, cookies2):
     kf = "%(name)s____%(domain)s____%(path)s"
-    cookies = dict(
-        [(kf % c, d)
-         for c, d in
-         [(get_cookie_info(cc), cc) for cc in cookies1]
-        ])
+    cookies = dict([
+        (kf % c, d)
+        for c, d in
+        [(get_cookie_info(cc), cc) for cc in cookies1]
+    ])
     for i in cookies2:
         k = kf % get_cookie_info(i)
-        if k in cookies:
-            j = cookies[k]
+        #if k in cookies:
+        #    j = cookies[k]
             #if j != i:
             #    print "-"*80
             #    print k
@@ -1591,14 +1618,18 @@ def merge_cookies(cookies1, cookies2):
 class SpynnerError(Exception):
     """General Spynner error."""
 
+
 class SpynnerPageError(Exception):
     """Error loading page."""
+
 
 class SpynnerTimeout(Exception):
     """A timeout (usually on page load) has been reached."""
 
+
 class SpynnerJavascriptError(Exception):
     """Error on the injected Javascript code."""
+
 
 class ExtendedNetworkCookieJar(QNetworkCookieJar):
     def mozillaCookies(self):
@@ -1638,7 +1669,7 @@ class ExtendedNetworkCookieJar(QNetworkCookieJar):
             cookie.setExpirationDate(QDateTime.fromTime_t(int(expiration)))
             return cookie
         cookies = [get_cookie(line) for line in string_cookies.splitlines()
-          if line.strip() and not line.strip().startswith("#")]
+                   if line.strip() and not line.strip().startswith("#")]
         self.setAllCookies(filter(bool, cookies))
 
     def cookiesForUrl(self, qurl):
@@ -1650,7 +1681,8 @@ class ExtendedNetworkCookieJar(QNetworkCookieJar):
 
 
 class NManager(QNetworkAccessManager):
-    ob = None # Browser instance
+    ob = None  # Browser instance
+
     @classmethod
     def new(klass, spynner, cookiejar_klass=None):
         if not cookiejar_klass:
@@ -1671,7 +1703,7 @@ class NManager(QNetworkAccessManager):
             jar.allCookies(),
         )
         manager.cookieJar().setAllCookies(cookies)
-        url = six.u(toString(request.url()))
+        url = toString(request.url())
         operation_name = self._operation_names.get(
             operation, str(operation)).upper()
         req = self.make_request(request, operation_name)
@@ -1728,15 +1760,15 @@ class NManager(QNetworkAccessManager):
                 proxy.setType(QNetworkProxy.FtpCachingProxy)
             else:
                 proxy.setType(QNetworkProxy.NoProxy)
-            if urlinfo.hostname != None:
+            if urlinfo.hostname is not None:
                 proxy.setHostName(urlinfo.hostname)
-            if urlinfo.port != None:
+            if urlinfo.port is not None:
                 proxy.setPort(urlinfo.port)
-            if urlinfo.username != None:
+            if urlinfo.username is not None:
                 proxy.setUser(urlinfo.username)
             else:
                 proxy.setUser('')
-            if urlinfo.password != None:
+            if urlinfo.password is not None:
                 proxy.setPassword(urlinfo.password)
             else:
                 proxy.setPassword('')

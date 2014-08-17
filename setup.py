@@ -21,8 +21,9 @@ from distutils.cmd import Command
 version = '2.20.dev0'
 url = "https://github.com/makinacorpus/spynner"
 
+
 def read(rnames):
-    setupdir =  os.path.dirname( os.path.abspath(__file__))
+    setupdir = os.path.dirname(os.path.abspath(__file__))
     return open(
         os.path.join(setupdir, rnames)
     ).read()
@@ -34,19 +35,21 @@ setup(
     author="Arnau Sanchez, Mathieu Le Marec-Pasquet",
     author_email="tokland@gmail.com, kiorky@cryptelium.net",
     url=url,
-    packages = find_packages('src'),
-    package_dir = {'': 'src'},
+    packages=find_packages('src'),
+    package_dir={'': 'src'},
     install_requires=[
         'six',
         'beautifulsoup4',
-        'unittest2',
-        'pyquery',
-        'autopy',  #'https://github.com/Riamse/autopy.git',
+        'pyquery==1.2.8',
+        'autopy==0.52',
         'setuptools',
+    ],
+    dependency_links=[
+        "git+https://github.com/pashinin/autopy.git#egg=autopy-0.52"
     ],
     scripts=[],
     license="GPL v3.0",
-    long_description = (
+    long_description=(
         read('README.rst')
         + '\n' +
         read('src/spynner/tests/spynner.rst')

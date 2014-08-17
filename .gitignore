@@ -10,3 +10,5 @@ dist/
 parts/
 plone.env
 *.egg-info
+TAGS
+build/

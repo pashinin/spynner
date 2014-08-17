@@ -1,20 +1,44 @@
 language: python
 python:
-  - 2.7
-virtualenv:
-  system_site_packages: true
+  - "2.7_with_system_site_packages"
+  - "3.4"
 env:
-  - TARGET=test CONFIG=buildout.cfg
+  global:
+    - TARGET=test CONFIG=buildout.cfg
+  matrix:
+    - PYSIDE=true
+    - PYSIDE=false
+
+matrix:
+  fast_finish: true
+  exclude:
+    - python: "3.4"
+      env: PYSIDE=false      # don't want to compile PyQt in a Virtual Env
+
 before_install:
-  - sudo apt-get update
-  - sudo apt-get install -y libqt4-dev python-qt4 pyqt4-dev-tools qt4-designer python-sip-dev python-sip libxtst-dev libxml2-dev libxslt1-dev
-  - easy_install -U setuptools
-  - python -c 'import sip'
-  - python -c 'import PyQt4'
-  - python -c 'import PyQt4.QtCore'
+  - sudo apt-get -y update
+  - sudo apt-get install -y python3-dev cmake libqt4-dev python-qt4 python3-pyqt4 pyqt4-dev-tools qt4-designer python-sip-dev python-sip libxtst-dev libxml2-dev libxslt1-dev
+  - pip install webob
+  - pip install webtest
+  - pip install requests
+  - if [[ $TRAVIS_PYTHON_VERSION == '2.7_with_system_site_packages' && $PYSIDE == 'true' ]]; then
+      sudo apt-get install -y python-pyside;
+    fi
+  - sudo pip install setuptools -U
+  - if [[ $TRAVIS_PYTHON_VERSION == '3.4' && $PYSIDE == 'true' ]]; then
+      sudo ~/virtualenv/python${TRAVIS_PYTHON_VERSION}/bin/pip install https://github.com/parkin/python-wheelhouse/raw/1963503674c11b54b5112a96b5186813e48e6af1/PySide-1.2.2-cp34-cp34m-linux_x86_64.whl;
+      sudo ~/virtualenv/python${TRAVIS_PYTHON_VERSION}/bin/python ~/virtualenv/python${TRAVIS_PYTHON_VERSION}/bin/pyside_postinstall.py -install;
+    fi
+  - if [[ $PYSIDE == 'true' ]]; then python -c 'from PySide import QtGui'; fi
+  #- python -c 'import sip'
+  #- python -c 'import PyQt4'
+  #- python -c 'import PyQt4.QtCore'
   - "export DISPLAY=:99.0"
   - "sh -e /etc/init.d/xvfb start"
 install:
   - python bootstrap.py
   - bin/buildout -N -t 3 -c $CONFIG
 script: bin/$TARGET
+
+notifications:
+  email: false

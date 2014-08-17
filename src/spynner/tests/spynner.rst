@@ -2,7 +2,8 @@ Initializing the browser
 ==================================
 The main concept to have a browser out there::
 
-    >>> import spynner, os, sys
+    >>> from __future__ import print_function
+    >>> import spynner, os, sys, six
     >>> def print_contents(browser, dest='~/.browser.html'):
     ...     """Print the browser contents somewhere for you to see its context
     ...     in doctest pdb, type print_contents(browser) and that's it, open firefox
@@ -10,7 +11,7 @@ The main concept to have a browser out there::
     ...     import os
     ...     open(os.path.expanduser(dest), 'w').write(browser.contents)
     >>> import time
-    >>> from StringIO import StringIO
+    >>> from six import BytesIO as StringIO
     >>> debug_stream = StringIO()
     >>> bp = os.path.dirname(spynner.tests.__file__)
 
@@ -22,18 +23,18 @@ When all is done::
 
     >>> browser.close()
     >>> def run_debug(callback, *args, **kwargs): # ** *
-    ...     pos = debug_stream.pos
+    ...     pos = debug_stream.tell()
     ...     ret = callback(*args, **kwargs)
     ...     show_debug(pos)
     ...     return ret
 
 
     >>> def show_debug(pos=None):
-    ...     if not pos: print debug_stream.getvalue()
+    ...     if not pos: print(debug_stream.getvalue())
     ...     else:
-    ...         pnow = debug_stream.pos
+    ...         pnow = debug_stream.tell()
     ...         debug_stream.seek(pos)
-    ...         print debug_stream.read()
+    ...         print(debug_stream.read().decode('utf-8'))
     ...         debug_stream.seek(pnow)
 
 
@@ -118,8 +119,7 @@ It will throw an exception, but stop::
 Finnish to play, go to the real target::
 
     >>> ret = browser.load(bp+"/html_controls.html", 1, wait_callback=wait_load)
-    >>> [a for a in debug_stream.getvalue().splitlines() if 'SPYNNER waitload' in a][-1]
-    'SPYNNER waitload: The callback found what it was waiting for in its contents!'
+    >>> assert([a for a in debug_stream.getvalue().decode('utf-8').splitlines() if 'SPYNNER waitload' in a][-1] == 'SPYNNER waitload: The callback found what it was waiting for in its contents!')
 
 Interact with the controls
 ============================
@@ -273,20 +273,16 @@ Using webkit native methods
 Under the hood, we use this.evaluateJavaScript('this.value = xxx') ::
 
     >>> browser.wk_select('#sel', 'aa')
-    >>> browser.runjs('$("#sel").val();').toString()
-    PyQt4.QtCore.QString(u'aa')
+    >>> assert(browser.runjs('$("#sel").val();') == 'aa')
     >>> browser.wk_select('#sel', 'bb')
-    >>> browser.runjs('$("#sel").val();').toString()
-    PyQt4.QtCore.QString(u'bb')
+    >>> assert(browser.runjs('$("#sel").val();') == 'bb')
     >>> browser.wk_select('#sel', 'dd')
-    >>> browser.runjs('$("#sel").val();').toString()
-    PyQt4.QtCore.QString(u'dd')
+    >>> assert(browser.runjs('$("#sel").val();') == 'dd')
 
 If it is not a multiple it takes the last::
 
     >>> browser.wk_select('#sel', ['aa', 'bb', 'dd'])
-    >>> browser.runjs('$("#sel").val();').toString()
-    PyQt4.QtCore.QString(u'dd')
+    >>> assert(browser.runjs('$("#sel").val();') == 'dd')
 
 If it is a multiple it takes all::
 
@@ -309,7 +305,7 @@ Using jquery
 Under the hood, we use $(sel).attr("selected", "selected")::
 
     >>> browser.select('#sel option[name="bbb"]')
-    >>> pos = debug_stream.pos
+    >>> pos = debug_stream.tell()
     >>> ret = run_debug(browser.runjs, '$($("#sel option")).each(function(i, e){je=$(e);console.log(je.attr("name")+" "+je.attr("selected"));});')
     Run Javascript code: $($("#sel option")).each(function(i, e){je=$(e);console.log(je.attr("name")+" "+je.attr("selected"));});
     Javascript console (:1): aaa false
@@ -478,5 +474,3 @@ You can also use proxy in the download method.
 Note that it will use by default the proxy setted via a previous br.set_proxy call::
 
     br.download('http://superfile', proxy_url='foo:3128')
-
-
