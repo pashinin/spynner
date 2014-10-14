@@ -1425,7 +1425,7 @@ class Browser(object):
         @note: If url is a path, the current base URL will be pre-appended.
         """
         def _on_reply(reply):
-            #url = toString(reply.url())
+            url = toString(reply.url())
             self._download_reply_status = not bool(reply.error())
         self._download_reply_status = None
         if not urlparse.urlsplit(url).scheme:
@@ -1603,8 +1603,8 @@ def merge_cookies(cookies1, cookies2):
     ])
     for i in cookies2:
         k = kf % get_cookie_info(i)
-        #if k in cookies:
-        #    j = cookies[k]
+        if k in cookies:
+            j = cookies[k]
             #if j != i:
             #    print "-"*80
             #    print k
